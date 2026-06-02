@@ -1,32 +1,139 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const admin = require("firebase-admin");
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+admin.initializeApp();
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+exports.onAttendanceWrite = onDocumentWritten(
+  "attendance/{attendanceId}",
+  async (event) => {
+    console.log("🔥 FUNCTION TRIGGERED");
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+    if (!after) {
+      console.log("No 'after' data, exiting");
+      return;
+    }
+
+    const isPunchOut = !!after?.timeOut;
+
+    if (!isPunchOut) {
+      console.log("Skipping (not punch-out)");
+      return;
+    }
+
+    console.log("➡️ Punch-out detected:", after.userId);
+
+    const userId = after.userId;
+
+    const timeInRaw = after.timeIn;
+    const timeIn =
+      timeInRaw?.toDate?.() ??
+      (timeInRaw ? new Date(timeInRaw) : null);
+
+    if (!timeIn || isNaN(timeIn.getTime())) {
+      console.log("❌ Invalid timeIn:", timeInRaw);
+      return;
+    }
+
+    const timeOutRaw = after.timeOut;
+    const timeOut =
+      timeOutRaw?.toDate?.() ??
+      (timeOutRaw ? new Date(timeOutRaw) : null);
+
+    if (!timeOut || isNaN(timeOut.getTime())) {
+      console.log("❌ Invalid timeOut:", timeOutRaw);
+      return;
+    }
+
+    const inMinutes = timeIn.getHours() * 60 + timeIn.getMinutes();
+    const outMinutes = timeOut.getHours() * 60 + timeOut.getMinutes();
+
+    function timeStringToMinutes(str) {
+      const [h, m] = str.split(":").map(Number);
+      return h * 60 + m;
+    }
+
+    const scheduleStart = after.schedule?.start || "09:00";
+    const scheduleEnd = after.schedule?.end || "18:00";
+
+    const startMinutes = timeStringToMinutes(scheduleStart);
+    const endMinutes = timeStringToMinutes(scheduleEnd);
+
+    const late = Math.max(0, inMinutes - startMinutes);
+    const undertime = Math.max(0, endMinutes - outMinutes);
+    const overtime = Math.max(0, outMinutes - endMinutes);
+
+    const regularHours =
+      Math.max(
+        0,
+        Math.min(outMinutes, endMinutes) -
+        Math.max(inMinutes, startMinutes)
+      ) / 60;
+
+    console.log("📊 Calculations:", {
+      userId,
+      late,
+      undertime,
+      overtime,
+      regularHours
+    });
+
+    function calculateNightDiff(inMin, outMin) {
+      const NIGHT_START = 22 * 60;
+      const NIGHT_END = 6 * 60;
+
+      let total = 0;
+      let current = inMin;
+
+      while (current !== outMin) {
+        const m = current % (24 * 60);
+
+        if (m >= NIGHT_START || m < NIGHT_END) {
+          total++;
+        }
+
+        current = (current + 1) % (24 * 60);
+
+        if (current === inMin) break;
+      }
+
+      return total / 60;
+    }
+
+    const nightDiff = calculateNightDiff(inMinutes, outMinutes);
+
+    const db = admin.firestore();
+
+    const workDate = timeIn.toISOString().split("T")[0];
+
+    console.log("💾 Writing dailySummary:", {
+      userId,
+      workDate
+    });
+
+    try {
+      await db
+        .collection("dailySummary")
+        .doc(`${userId}_${workDate}`)
+        .set(
+          {
+            userId,
+            date: workDate,
+            regularHours,
+            overtime,
+            nightDiff,
+            late,
+            undertime,
+            createdAt: new Date(),
+          },
+          { merge: true }
+        );
+
+      console.log("✅ dailySummary WRITE SUCCESS");
+    } catch (err) {
+      console.error("❌ Firestore write failed:", err);
+    }
+  }
+);
