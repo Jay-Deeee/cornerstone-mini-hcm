@@ -15,6 +15,7 @@ export default function Dashboard() {
   const user = auth.currentUser;
   const [attendance, setAttendance] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [dailySummary, setDailySummary] = useState(null);
 
   const handlePunchIn = async () => {
     if (!user) {
@@ -124,9 +125,27 @@ export default function Dashboard() {
     }
   };
 
+  const loadDailySummary = async () => {
+    const today =
+      new Date().toISOString().split("T")[0];
+
+    const summaryDoc = await getDoc(
+      doc(
+        db,
+        "dailySummary",
+        `${user.uid}_${today}`
+      )
+    );
+
+    if (summaryDoc.exists()) {
+      setDailySummary(summaryDoc.data());
+    }
+  };
+
   useEffect(() => {
     loadAttendance();
     loadUserData();
+    loadDailySummary();
   }, []);
 
   const calculateMetrics = () => {
@@ -156,6 +175,13 @@ export default function Dashboard() {
   const metrics = calculateMetrics();
 
   console.log(metrics);
+
+  const formatMinutes = (minutes) => {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    return `${hours}h ${remainingMinutes}m`;
+  };
 
   return (
     <div>
@@ -197,6 +223,32 @@ export default function Dashboard() {
                   .toDate()
                   .toLocaleString()
               : "--"}
+          </p>
+        </div>
+      )}
+
+      {dailySummary && (
+        <div>
+          <h2>Today's Summary</h2>
+
+          <p>
+            Regular Hours: {dailySummary.regularHours.toFixed(2)} hrs
+          </p>
+
+          <p>
+            Overtime: {formatMinutes(dailySummary.overtime)}
+          </p>
+
+          <p>
+            Night Differential: {dailySummary.nightDiff.toFixed(2)} hrs
+          </p>
+
+          <p>
+            Late: {formatMinutes(dailySummary.late)}
+          </p>
+
+          <p>
+            Undertime: {formatMinutes(dailySummary.undertime)}
           </p>
         </div>
       )}
