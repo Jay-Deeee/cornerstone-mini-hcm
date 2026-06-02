@@ -4,7 +4,8 @@ import {
   doc,
   getDoc,
   getDocs,
-  collection
+  collection,
+  updateDoc
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -12,6 +13,11 @@ export default function Admin() {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [users, setUsers] = useState({});
   const [isAdmin, setIsAdmin] = useState(null);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [editTimeIn, setEditTimeIn] = useState("");
+  const [editTimeOut, setEditTimeOut] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [dailyReports, setDailyReports] = useState([]);
 
   const checkAdmin = async (user) => {
     try {
@@ -48,6 +54,21 @@ export default function Admin() {
     }
   };
 
+  const loadDailyReports = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "dailySummary"));
+
+      const reports = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setDailyReports(reports);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -64,6 +85,7 @@ export default function Admin() {
   useEffect(() => {
     if (isAdmin !== true) return;
     loadData();
+    loadDailyReports();
   }, [isAdmin]);
 
   const isLoading = isAdmin === null;
@@ -76,6 +98,37 @@ export default function Admin() {
   if (isUnauthorized) {
     return <div>Unauthorized</div>;
   }
+
+  const openEditModal = (record) => {
+    setSelectedRecord(record);
+
+    setEditTimeIn(
+      record.timeIn?.toDate().toISOString().slice(0, 16) || ""
+    );
+
+    setEditTimeOut(
+      record.timeOut?.toDate().toISOString().slice(0, 16) || ""
+    );
+
+    setEditStatus(record.status || "open");
+  };
+
+  const saveEdit = async () => {
+    if (!selectedRecord) return;
+
+    try {
+      await updateDoc(doc(db, "attendance", selectedRecord.id), {
+        timeIn: editTimeIn ? new Date(editTimeIn) : null,
+        timeOut: editTimeOut ? new Date(editTimeOut) : null,
+        status: editStatus,
+      });
+
+      setSelectedRecord(null);
+      loadData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div>
@@ -96,7 +149,7 @@ export default function Admin() {
 
         <tbody>
           {attendanceRecords.map((record) => (
-            <tr key={record.id}>
+            <tr key={record.id} onClick={() => openEditModal(record)} style={{ cursor: "pointer" }}>
               <td>
                 <div>
                   <strong>
@@ -129,6 +182,91 @@ export default function Admin() {
           ))}
         </tbody>
       </table>
+
+      <h2>Daily Summary Report</h2>
+
+      <table border="1">
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Date</th>
+            <th>Regular</th>
+            <th>OT</th>
+            <th>Late</th>
+            <th>Undertime</th>
+            <th>Night Diff</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {dailyReports.map((report) => (
+            <tr key={report.id}>
+              <td>{report.userId}</td>
+              <td>{report.date}</td>
+              <td>{(report.regularHours ?? 0).toFixed(2)}</td>
+              <td>{report.overtime}</td>
+              <td>{report.late}</td>
+              <td>{report.undertime}</td>
+              <td>{(report.nightDiff ?? 0).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {selectedRecord && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+          <div style={{ background: "white", padding: 20, minWidth: 300 }}>
+            <h3>Edit Attendance</h3>
+
+            <label>Time In</label>
+            <input
+              type="datetime-local"
+              value={editTimeIn}
+              onChange={(e) => setEditTimeIn(e.target.value)}
+            />
+
+            <br />
+
+            <label>Time Out</label>
+            <input
+              type="datetime-local"
+              value={editTimeOut}
+              onChange={(e) => setEditTimeOut(e.target.value)}
+            />
+
+            <br />
+
+            <label>Status</label>
+            <select
+              value={editStatus}
+              onChange={(e) => setEditStatus(e.target.value)}
+            >
+              <option value="open">Open</option>
+              <option value="completed">Completed</option>
+            </select>
+
+            <br /><br />
+
+            <button onClick={saveEdit}>
+              Save
+            </button>
+
+            <button onClick={() => setSelectedRecord(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
