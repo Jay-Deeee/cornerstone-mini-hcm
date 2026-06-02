@@ -13,67 +13,69 @@ export default function Admin() {
   const [users, setUsers] = useState({});
   const [isAdmin, setIsAdmin] = useState(null);
 
+  const checkAdmin = async (user) => {
+    try {
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+
+      setIsAdmin(userSnap.data()?.role === "admin");
+    } catch (err) {
+      console.error(err);
+      setIsAdmin(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const [attendanceSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db, "attendance")),
+        getDocs(collection(db, "users")),
+      ]);
+
+      const attendance = attendanceSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const usersMap = {};
+      usersSnap.docs.forEach((doc) => {
+        usersMap[doc.id] = doc.data();
+      });
+
+      setAttendanceRecords(attendance);
+      setUsers(usersMap);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setIsAdmin(false);
         return;
       }
 
-      try {
-        const userSnap = await getDoc(
-          doc(db, "users", user.uid)
-        );
-
-        const isAdminUser = userSnap.data()?.role === "admin";
-
-        setIsAdmin(isAdminUser);
-      } catch (err) {
-        console.error(err);
-        setIsAdmin(false);
-      }
+      checkAdmin(user);
     });
 
     return () => unsub();
   }, []);
 
-  if (isAdmin === null) {
+  useEffect(() => {
+    if (isAdmin !== true) return;
+    loadData();
+  }, [isAdmin]);
+
+  const isLoading = isAdmin === null;
+  const isUnauthorized = isAdmin === false;
+
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
-  if (isAdmin === false) {
+  if (isUnauthorized) {
     return <div>Unauthorized</div>;
   }
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [attendanceSnap, usersSnap] = await Promise.all([
-          getDocs(collection(db, "attendance")),
-          getDocs(collection(db, "users")),
-        ]);
-
-        const attendance = attendanceSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        const usersMap = {};
-        usersSnap.docs.forEach((doc) => {
-          usersMap[doc.id] = doc.data();
-        });
-
-        setAttendanceRecords(attendance);
-        setUsers(usersMap);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    if (isAdmin) {
-      loadData();
-    }
-  }, [isAdmin]);
 
   return (
     <div>
