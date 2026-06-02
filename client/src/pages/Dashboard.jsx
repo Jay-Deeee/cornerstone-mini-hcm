@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [attendance, setAttendance] = useState(null);
   const [userData, setUserData] = useState(null);
   const [dailySummary, setDailySummary] = useState(null);
+  const [attendanceHistory, setAttendanceHistory] =
+    useState([]);
 
   const handlePunchIn = async () => {
     if (!user) {
@@ -142,10 +144,28 @@ export default function Dashboard() {
     }
   };
 
+  const loadAttendanceHistory = async () => {
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("userId", "==", user.uid)
+    );
+
+    const snapshot =
+      await getDocs(attendanceQuery);
+
+    const records = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    setAttendanceHistory(records);
+  };
+
   useEffect(() => {
     loadAttendance();
     loadUserData();
     loadDailySummary();
+    loadAttendanceHistory();
   }, []);
 
   const calculateMetrics = () => {
@@ -252,6 +272,43 @@ export default function Dashboard() {
           </p>
         </div>
       )}
+
+      <h2>Attendance History</h2>
+
+      <table border="1">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time In</th>
+            <th>Time Out</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {attendanceHistory.map((record) => (
+            <tr key={record.id}>
+              <td>{record.date}</td>
+
+              <td>
+                {record.timeIn
+                  ?.toDate()
+                  .toLocaleString()}
+              </td>
+
+              <td>
+                {record.timeOut
+                  ? record.timeOut
+                      .toDate()
+                      .toLocaleString()
+                  : "--"}
+              </td>
+
+              <td>{record.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
     </div>
   );
