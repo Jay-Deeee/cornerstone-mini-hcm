@@ -26,7 +26,7 @@ export default function Register() {
       name,
       email,
       role: "employee",
-      timezone: "Asia/Manila",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       schedule: {
         start: "09:00",
         end: "18:00",

@@ -1,3 +1,22 @@
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import { useNavigate } from "react-router-dom";
+
 export default function Dashboard() {
-  return <h1>Dashboard Page</h1>;
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/");
+  };
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+
+      <button onClick={handleLogout}>
+        Logout
+      </button>
+    </div>
+  );
 }
