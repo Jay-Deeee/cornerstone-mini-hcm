@@ -10,14 +10,14 @@ import {
   getDoc
 } from "firebase/firestore";
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthProvider";
 
 export default function Dashboard() {
-  const user = auth.currentUser;
+  const { user, loading } = useAuth();
   const [attendance, setAttendance] = useState(null);
   const [userData, setUserData] = useState(null);
   const [dailySummary, setDailySummary] = useState(null);
-  const [attendanceHistory, setAttendanceHistory] =
-    useState([]);
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
 
   const handlePunchIn = async () => {
     if (!user) {
@@ -100,6 +100,8 @@ export default function Dashboard() {
   };
 
   const loadAttendance = async () => {
+    if (!user) return;
+
     const today =
       new Date().toISOString().split("T")[0];
 
@@ -118,6 +120,8 @@ export default function Dashboard() {
   };
 
   const loadUserData = async () => {
+    if (!user) return;
+
     const userDoc = await getDoc(
       doc(db, "users", user.uid)
     );
@@ -128,6 +132,8 @@ export default function Dashboard() {
   };
 
   const loadDailySummary = async () => {
+    if (!user) return;
+
     const today =
       new Date().toISOString().split("T")[0];
 
@@ -145,28 +151,43 @@ export default function Dashboard() {
   };
 
   const loadAttendanceHistory = async () => {
+    if (!user) return;
+
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("userId", "==", user.uid)
     );
 
-    const snapshot =
-      await getDocs(attendanceQuery);
+    const snapshot = await getDocs(attendanceQuery);
 
     const records = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
 
-    setAttendanceHistory(records);
+    const sortedRecords = [...records].sort(
+      (a, b) => b.date.localeCompare(a.date)
+    );
+
+    setAttendanceHistory(sortedRecords);
   };
 
   useEffect(() => {
+    if (!user) return;
+
     loadAttendance();
     loadUserData();
     loadDailySummary();
     loadAttendanceHistory();
-  }, []);
+  }, [user]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <div>Not logged in</div>;
+  }
 
   const calculateMetrics = () => {
     if (!attendance || !userData) {
@@ -252,7 +273,7 @@ export default function Dashboard() {
           <h2>Today's Summary</h2>
 
           <p>
-            Regular Hours: {dailySummary.regularHours.toFixed(2)} hrs
+            Regular Hours: {(dailySummary.regularHours ?? 0).toFixed(2)} hrs
           </p>
 
           <p>
@@ -260,7 +281,7 @@ export default function Dashboard() {
           </p>
 
           <p>
-            Night Differential: {dailySummary.nightDiff.toFixed(2)} hrs
+            Night Differential: {(dailySummary.nightDiff ?? 0).toFixed(2)} hrs
           </p>
 
           <p>
