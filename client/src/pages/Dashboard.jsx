@@ -8,9 +8,11 @@ import {
   updateDoc,
   doc
 } from "firebase/firestore";
+import { useState, useEffect } from "react";
 
 export default function Dashboard() {
   const user = auth.currentUser;
+  const [attendance, setAttendance] = useState(null);
 
   const handlePunchIn = async () => {
     if (!user) {
@@ -24,15 +26,14 @@ export default function Dashboard() {
     const attendanceQuery = query(
       collection(db, "attendance"),
       where("userId", "==", user.uid),
-      where("date", "==", today),
-      where("status", "==", "open")
+      where("date", "==", today)
     );
 
     const snapshot =
       await getDocs(attendanceQuery);
 
     if (!snapshot.empty) {
-      alert("Already punched in today.");
+      alert("Attendance record already exists for today.");
       return;
     }
 
@@ -93,6 +94,28 @@ export default function Dashboard() {
     }
   };
 
+  const loadAttendance = async () => {
+    const today =
+      new Date().toISOString().split("T")[0];
+
+    const attendanceQuery = query(
+      collection(db, "attendance"),
+      where("userId", "==", user.uid),
+      where("date", "==", today)
+    );
+
+    const snapshot =
+      await getDocs(attendanceQuery);
+
+    if (!snapshot.empty) {
+      setAttendance(snapshot.docs[0]);
+    }
+  };
+
+  useEffect(() => {
+    loadAttendance();
+  }, []);
+
   return (
     <div>
       <h1>Dashboard</h1>
@@ -108,6 +131,31 @@ export default function Dashboard() {
       <button onClick={handlePunchOut}>
         Punch Out
       </button>
+
+      {attendance && (
+        <div>
+          <h2>Today's Attendance</h2>
+
+          <p>
+            Status: {attendance.data().status}
+          </p>
+
+          <p>
+            Time In:{" "}
+            {attendance.data().timeIn?.toDate().toLocaleString()}
+          </p>
+
+          <p>
+            Time Out:{" "}
+            {attendance.data().timeOut
+              ? attendance.data().timeOut
+                  .toDate()
+                  .toLocaleString()
+              : "--"}
+          </p>
+        </div>
+      )}
+
     </div>
   );
 }
