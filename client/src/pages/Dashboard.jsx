@@ -6,13 +6,15 @@ import {
   where,
   getDocs,
   updateDoc,
-  doc
+  doc,
+  getDoc
 } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 export default function Dashboard() {
   const user = auth.currentUser;
   const [attendance, setAttendance] = useState(null);
+  const [userData, setUserData] = useState(null);
 
   const handlePunchIn = async () => {
     if (!user) {
@@ -112,9 +114,48 @@ export default function Dashboard() {
     }
   };
 
+  const loadUserData = async () => {
+    const userDoc = await getDoc(
+      doc(db, "users", user.uid)
+    );
+
+    if (userDoc.exists()) {
+      setUserData(userDoc.data());
+    }
+  };
+
   useEffect(() => {
     loadAttendance();
+    loadUserData();
   }, []);
+
+  const calculateMetrics = () => {
+    if (!attendance || !userData) {
+      return null;
+    }
+
+    const attendanceData =
+      attendance.data();
+
+    if (!attendanceData.timeOut) {
+      return null;
+    }
+
+    const timeIn =
+      attendanceData.timeIn.toDate();
+
+    const timeOut =
+      attendanceData.timeOut.toDate();
+
+    return {
+      timeIn,
+      timeOut,
+    };
+  };
+
+  const metrics = calculateMetrics();
+
+  console.log(metrics);
 
   return (
     <div>
@@ -122,6 +163,10 @@ export default function Dashboard() {
 
       <p>
         Logged in as: {user?.email}
+      </p>
+
+      <p>
+        Schedule: {userData?.schedule?.start} - {userData?.schedule?.end}
       </p>
 
       <button onClick={handlePunchIn}>
