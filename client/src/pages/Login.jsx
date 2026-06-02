@@ -26,24 +26,26 @@ export default function Login() {
 
   return (
     <div>
-      <h1>Login</h1>
+      <h2 style={{ marginTop: "50px" }}>Login</h2>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: "300px", margin: "auto", padding: "100px, 50px", gap: "10px" }}>
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-      <input
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
 
-      <button onClick={handleLogin}>
-        Login
-      </button>
+        <button onClick={handleLogin} style={{ maxWidth: "100px" }}>
+          Login
+        </button>
 
       <p>
         Don't have an account?{" "}

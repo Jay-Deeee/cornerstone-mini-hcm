@@ -18,6 +18,7 @@ export default function Admin() {
   const [editTimeOut, setEditTimeOut] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [dailyReports, setDailyReports] = useState([]);
+  const [weeklyReports, setWeeklyReports] = useState([]);
 
   const checkAdmin = async (user) => {
     try {
@@ -54,6 +55,14 @@ export default function Admin() {
     }
   };
 
+  const getWeekNumber = (dateStr) => {
+    const date = new Date(dateStr);
+    const start = new Date(date.getFullYear(), 0, 1);
+    const diff = date - start;
+    const oneWeek = 1000 * 60 * 60 * 24 * 7;
+    return Math.floor(diff / oneWeek);
+  };
+
   const loadDailyReports = async () => {
     try {
       const snapshot = await getDocs(collection(db, "dailySummary"));
@@ -64,6 +73,32 @@ export default function Admin() {
       }));
 
       setDailyReports(reports);
+
+      const map = {};
+
+      reports.forEach((r) => {
+        const key = `${r.userId}_W${getWeekNumber(r.date)}`;
+
+        if (!map[key]) {
+          map[key] = {
+            userId: r.userId,
+            week: getWeekNumber(r.date),
+            regularHours: 0,
+            overtime: 0,
+            late: 0,
+            undertime: 0,
+            nightDiff: 0,
+          };
+        }
+
+        map[key].regularHours += r.regularHours || 0;
+        map[key].overtime += r.overtime || 0;
+        map[key].late += r.late || 0;
+        map[key].undertime += r.undertime || 0;
+        map[key].nightDiff += r.nightDiff || 0;
+      });
+
+      setWeeklyReports(Object.values(map));
     } catch (err) {
       console.error(err);
     }
@@ -131,87 +166,145 @@ export default function Admin() {
   };
 
   return (
-    <div>
+    <div style={{ padding: "20px", maxWidth: "1200px", margin: "0 auto" }}>
       <h1>Admin Dashboard</h1>
 
-      <h2>All Attendance Records</h2>
+        <h2>All Attendance Records</h2>
 
-      <table border="1">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Date</th>
-            <th>Time In</th>
-            <th>Time Out</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <table border="1">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Date</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Status</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {attendanceRecords.map((record) => (
-            <tr key={record.id} onClick={() => openEditModal(record)} style={{ cursor: "pointer" }}>
-              <td>
-                <div>
-                  <strong>
-                    {users[record.userId]?.name || "Unknown User"}
-                  </strong>
-                  <div style={{ fontSize: "12px", color: "#666" }}>
-                    {users[record.userId]?.email || record.userId}
+          <tbody>
+            {attendanceRecords.map((record) => (
+              <tr key={record.id} onClick={() => openEditModal(record)} style={{ cursor: "pointer" }}>
+                <td>
+                  <div>
+                    <strong>
+                      {users[record.userId]?.name || "Unknown User"}
+                    </strong>
+                    <div style={{ fontSize: "12px", color: "#666" }}>
+                      {users[record.userId]?.email || record.userId}
+                    </div>
                   </div>
-                </div>
-              </td>
+                </td>
 
-              <td>{record.date}</td>
+                <td>{record.date}</td>
 
-              <td>
-                {record.timeIn
-                  ?.toDate()
-                  .toLocaleString()}
-              </td>
+                <td>
+                  {record.timeIn
+                    ?.toDate()
+                    .toLocaleString()}
+                </td>
 
-              <td>
-                {record.timeOut
-                  ? record.timeOut
-                      .toDate()
-                      .toLocaleString()
-                  : "--"}
-              </td>
+                <td>
+                  {record.timeOut
+                    ? record.timeOut
+                        .toDate()
+                        .toLocaleString()
+                    : "--"}
+                </td>
 
-              <td>{record.status}</td>
+                <td>{record.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+      <br />
+
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <h2>Daily Summary Report</h2>
+
+        <table border="1">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Date</th>
+              <th>Regular</th>
+              <th>OT</th>
+              <th>Late</th>
+              <th>Undertime</th>
+              <th>Night Diff</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
 
-      <h2>Daily Summary Report</h2>
+          <tbody>
+            {dailyReports.map((report) => (
+              <tr key={report.id}>
+                <td>
+                  <div>
+                    <strong>
+                      {users[report.userId]?.name || "Unknown User"}
+                    </strong>
 
-      <table border="1">
-        <thead>
-          <tr>
-            <th>User ID</th>
-            <th>Date</th>
-            <th>Regular</th>
-            <th>OT</th>
-            <th>Late</th>
-            <th>Undertime</th>
-            <th>Night Diff</th>
-          </tr>
-        </thead>
+                    <div style={{ fontSize: "12px", color: "#666" }}>
+                      {users[report.userId]?.email || report.userId}
+                    </div>
+                  </div>
+                </td>
+                <td>{report.date}</td>
+                <td>{(report.regularHours ?? 0).toFixed(2)}</td>
+                <td>{report.overtime}</td>
+                <td>{report.late}</td>
+                <td>{report.undertime}</td>
+                <td>{(report.nightDiff ?? 0).toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-        <tbody>
-          {dailyReports.map((report) => (
-            <tr key={report.id}>
-              <td>{report.userId}</td>
-              <td>{report.date}</td>
-              <td>{(report.regularHours ?? 0).toFixed(2)}</td>
-              <td>{report.overtime}</td>
-              <td>{report.late}</td>
-              <td>{report.undertime}</td>
-              <td>{(report.nightDiff ?? 0).toFixed(2)}</td>
+      <br />
+
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <h2>Weekly Summary Report</h2>
+
+        <table border="1">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Week</th>
+              <th>Regular</th>
+              <th>OT</th>
+              <th>Late</th>
+              <th>Undertime</th>
+              <th>Night Diff</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {weeklyReports.map((report, i) => (
+              <tr key={i}>
+                <td>
+                  <div>
+                    <strong>
+                      {users[report.userId]?.name || "Unknown User"}
+                    </strong>
+
+                    <div style={{ fontSize: "12px", color: "#666" }}>
+                      {users[report.userId]?.email || report.userId}
+                    </div>
+                  </div>
+                </td>
+                <td>Week {report.week}</td>
+                <td>{report.regularHours.toFixed(2)}</td>
+                <td>{report.overtime}</td>
+                <td>{report.late}</td>
+                <td>{report.undertime}</td>
+                <td>{report.nightDiff.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {selectedRecord && (
         <div style={{

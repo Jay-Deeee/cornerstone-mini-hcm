@@ -236,13 +236,15 @@ export default function Dashboard() {
         Schedule: {userData?.schedule?.start} - {userData?.schedule?.end}
       </p>
 
-      <button onClick={handlePunchIn}>
-        Punch In
-      </button>
+      <div style={{ display: "flex", justifyContent: "center", gap: "30px", marginBottom: "40px" }}>
+        <button onClick={handlePunchIn}>
+          Punch In
+        </button>
 
-      <button onClick={handlePunchOut}>
-        Punch Out
-      </button>
+        <button onClick={handlePunchOut}>
+          Punch Out
+        </button>
+      </div>
 
       {attendance && (
         <div>
@@ -267,6 +269,8 @@ export default function Dashboard() {
           </p>
         </div>
       )}
+
+      <br />
 
       {dailySummary && (
         <div>
@@ -294,42 +298,46 @@ export default function Dashboard() {
         </div>
       )}
 
-      <h2>Attendance History</h2>
+      <br />
 
-      <table border="1">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Time In</th>
-            <th>Time Out</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <h2>Attendance History</h2>
 
-        <tbody>
-          {attendanceHistory.map((record) => (
-            <tr key={record.id}>
-              <td>{record.date}</td>
-
-              <td>
-                {record.timeIn
-                  ?.toDate()
-                  .toLocaleString()}
-              </td>
-
-              <td>
-                {record.timeOut
-                  ? record.timeOut
-                      .toDate()
-                      .toLocaleString()
-                  : "--"}
-              </td>
-
-              <td>{record.status}</td>
+        <table border="1">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {attendanceHistory.map((record) => (
+              <tr key={record.id}>
+                <td>{record.date}</td>
+
+                <td>
+                  {record.timeIn
+                    ?.toDate()
+                    .toLocaleString()}
+                </td>
+
+                <td>
+                  {record.timeOut
+                    ? record.timeOut
+                        .toDate()
+                        .toLocaleString()
+                    : "--"}
+                </td>
+
+                <td>{record.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
     </div>
   );
