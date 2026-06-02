@@ -47,16 +47,61 @@ exports.onAttendanceWrite = onDocumentWritten(
       return;
     }
 
-    const inMinutes = timeIn.getHours() * 60 + timeIn.getMinutes();
-    const outMinutes = timeOut.getHours() * 60 + timeOut.getMinutes();
+    const userSnap = await admin.firestore()
+      .collection("users")
+      .doc(userId)
+      .get();
+
+    if (!userSnap.exists) {
+      console.log("❌ User not found:", userId);
+      return;
+    }
+
+    const schedule = userSnap.data()?.schedule || {
+      start: "09:00",
+      end: "18:00"
+    };
+
+    const userTimezone =
+      userSnap.data()?.timezone || "Asia/Singapore";
+
+    function getMinutesInTimezone(date, timezone) {
+      const formatter = new Intl.DateTimeFormat(
+        "en-US",
+        {
+          timeZone: timezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }
+      );
+
+      const parts = formatter.formatToParts(date);
+
+      const hour = Number(
+        parts.find(p => p.type === "hour").value
+      );
+
+      const minute = Number(
+        parts.find(p => p.type === "minute").value
+      );
+
+      return hour * 60 + minute;
+    }
+
+    const inMinutes =
+      getMinutesInTimezone(timeIn, userTimezone);
+
+    const outMinutes =
+      getMinutesInTimezone(timeOut, userTimezone);
 
     function timeStringToMinutes(str) {
       const [h, m] = str.split(":").map(Number);
       return h * 60 + m;
     }
 
-    const scheduleStart = after.schedule?.start || "09:00";
-    const scheduleEnd = after.schedule?.end || "18:00";
+    const scheduleStart = schedule.start;
+    const scheduleEnd = schedule.end;
 
     const startMinutes = timeStringToMinutes(scheduleStart);
     const endMinutes = timeStringToMinutes(scheduleEnd);
